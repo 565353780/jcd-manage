@@ -2,6 +2,7 @@ import os
 import numpy as np
 from typing import Union, List, BinaryIO
 
+from jcd_manage.Config.constant import JCD_HEADER
 from jcd_manage.Config.types import SurfaceType
 from jcd_manage.Data import (
     BaseData, Curve, Surface, Diamond, FontSurface, 
@@ -50,7 +51,7 @@ class JCDLoader(object):
 
                 # 跳过7字节未知数据
                 unknown_data = jcd_file.read(7)
-                
+
                 # 创建并读取对象
                 obj = self._read_object_by_type(jcd_file, surface_type)
                 if obj:
@@ -61,8 +62,8 @@ class JCDLoader(object):
     
     def _validate_header(self, jcd_file: BinaryIO) -> bool:
         """验证JCD文件头"""
-        header = jcd_file.read(len(self.JCD_HEADER)).decode('utf-8')
-        if header != self.JCD_HEADER:
+        header = jcd_file.read(len(JCD_HEADER)).decode('utf-8')
+        if header != JCD_HEADER:
             print(f'Header error: {header}')
             return False
         return True
