@@ -23,35 +23,55 @@ class IGESNURBSCurve(IGESEntity):
         """从IGES实体解析NURBS曲线数据"""
         self._set_basic_info(entity)
         
-        # 使用reader转换NURBS曲线
-        curve = reader.TransferCurve(entity)
+        try:
+            # 使用IGESToBRep转换器
+            from OCC.Core.IGESToBRep import IGESToBRep_CurveAndSurface
+            from OCC.Core.IGESGeom import IGESGeom_BSplineCurve
+            from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+            from OCC.Core.TopoDS import topods_Edge
+            from OCC.Core.TopAbs import TopAbs_EDGE
+            from OCC.Core.GeomAdaptor import GeomAdaptor_Curve
+            
+            # 检查是否为IGES BSpline曲线
+            bspline_curve = IGESGeom_BSplineCurve.DownCast(entity)
+            if bspline_curve:
+                # 转换器
+                converter = IGESToBRep_CurveAndSurface()
+                converter.Init()
+                
+                # 转换为曲线
+                curve = converter.TransferCurve(bspline_curve)
+                if curve:
+                    self._parse_geom_curve(curve)
+        except Exception as e:
+            # 如果转换失败，只保留基本信息
+            pass
+    
+    def _parse_geom_curve(self, curve):
+        """解析Geom曲线对象"""
+        from OCC.Core.Geom import Geom_BSplineCurve
         
         # 检查是否为BSpline曲线
-        from OCC.Core.Geom import Geom_BSplineCurve
-        if isinstance(curve, Geom_BSplineCurve):
-            self._parse_bspline_curve(curve)
-        # 如果不是BSpline曲线，保留基本信息即可
-    
-    def _parse_bspline_curve(self, curve):
-        """解析BSpline曲线对象"""
-        from OCC.Core.Geom import Geom_BSplineCurve
+        bspline = Geom_BSplineCurve.DownCast(curve)
+        if not bspline:
+            return
         
         # 基本参数
-        self.degree = curve.Degree()
-        self.is_periodic = curve.IsPeriodic()
-        self.is_rational = curve.IsRational()
+        self.degree = bspline.Degree()
+        self.is_periodic = bspline.IsPeriodic()
+        self.is_rational = bspline.IsRational()
         
         # 控制点
-        num_poles = curve.NbPoles()
+        num_poles = bspline.NbPoles()
         poles = np.zeros((num_poles, 3), dtype=np.float64)
         weights = np.zeros(num_poles, dtype=np.float64)
         
         for i in range(num_poles):
-            pole = curve.Pole(i + 1)  # OCC索引从1开始
+            pole = bspline.Pole(i + 1)  # OCC索引从1开始
             poles[i] = self.coord_to_array(pole)
             
             if self.is_rational:
-                weights[i] = curve.Weight(i + 1)
+                weights[i] = bspline.Weight(i + 1)
             else:
                 weights[i] = 1.0
         
@@ -59,13 +79,13 @@ class IGESNURBSCurve(IGESEntity):
         self.weights = weights
         
         # 节点向量
-        num_knots = curve.NbKnots()
+        num_knots = bspline.NbKnots()
         knots = np.zeros(num_knots, dtype=np.float64)
         mults = np.zeros(num_knots, dtype=np.int32)
         
         for i in range(num_knots):
-            knots[i] = curve.Knot(i + 1)
-            mults[i] = curve.Multiplicity(i + 1)
+            knots[i] = bspline.Knot(i + 1)
+            mults[i] = bspline.Multiplicity(i + 1)
         
         self.knots = knots
         self.multiplicities = mults

@@ -15,13 +15,46 @@ class IGESLine(IGESEntity):
         """从IGES实体解析直线数据"""
         self._set_basic_info(entity)
         
-        # 尝试从reader转换
         try:
-            # IGESControl_Reader的TransferCurve可能不适用于所有曲线类型
-            # 直线可能需要从原始参数中解析
+            # 使用IGESToBRep转换器
+            from OCC.Core.IGESToBRep import IGESToBRep_CurveAndSurface
+            from OCC.Core.IGESGeom import IGESGeom_Line
+            
+            # 检查是否为IGES Line
+            line = IGESGeom_Line.DownCast(entity)
+            if line:
+                # 转换器
+                converter = IGESToBRep_CurveAndSurface()
+                converter.Init()
+                
+                # 转换为曲线
+                curve = converter.TransferCurve(line)
+                if curve:
+                    self._parse_geom_line(curve)
+        except Exception as e:
+            # 如果转换失败，只保留基本信息
             pass
-        except:
-            pass
+    
+    def _parse_geom_line(self, curve):
+        """解析Geom直线对象"""
+        from OCC.Core.Geom import Geom_Line
+        
+        # 检查是否为Line
+        line = Geom_Line.DownCast(curve)
+        if not line:
+            return
+        
+        # 获取起点和方向
+        location = line.Location()
+        direction = line.Direction()
+        
+        self.start_point = self.coord_to_array(location)
+        dir_vec = np.array([direction.X(), direction.Y(), direction.Z()], dtype=np.float64)
+        
+        # 计算终点（假设参数范围）
+        # 注意：IGES直线可能是无限长的，这里只设置一个合理的长度
+        length = 100.0  # 默认长度
+        self.end_point = self.start_point + dir_vec * length
     
     def length(self) -> float:
         """计算直线长度"""

@@ -38,40 +38,56 @@ class IGESNURBSSurface(IGESEntity):
         """从IGES实体解析NURBS曲面数据"""
         self._set_basic_info(entity)
         
-        # 使用reader转换NURBS曲面
-        surface = reader.TransferSurface(entity)
+        try:
+            # 使用IGESToBRep转换器
+            from OCC.Core.IGESToBRep import IGESToBRep_CurveAndSurface
+            from OCC.Core.IGESGeom import IGESGeom_BSplineSurface
+            
+            # 检查是否为IGES BSpline曲面
+            bspline_surface = IGESGeom_BSplineSurface.DownCast(entity)
+            if bspline_surface:
+                # 转换器
+                converter = IGESToBRep_CurveAndSurface()
+                converter.Init()
+                
+                # 转换为曲面
+                surface = converter.TransferSurface(bspline_surface)
+                if surface:
+                    self._parse_geom_surface(surface)
+        except Exception as e:
+            # 如果转换失败，只保留基本信息
+            pass
+    
+    def _parse_geom_surface(self, surface):
+        """解析Geom曲面对象"""
+        from OCC.Core.Geom import Geom_BSplineSurface
         
         # 检查是否为BSpline曲面
-        from OCC.Core.Geom import Geom_BSplineSurface
-        if isinstance(surface, Geom_BSplineSurface):
-            self._parse_bspline_surface(surface)
-        # 如果不是BSpline曲面，保留基本信息即可
-    
-    def _parse_bspline_surface(self, surface):
-        """解析BSpline曲面对象"""
-        from OCC.Core.Geom import Geom_BSplineSurface
+        bspline = Geom_BSplineSurface.DownCast(surface)
+        if not bspline:
+            return
         
         # 基本参数
-        self.u_degree = surface.UDegree()
-        self.v_degree = surface.VDegree()
-        self.is_u_periodic = surface.IsUPeriodic()
-        self.is_v_periodic = surface.IsVPeriodic()
-        self.is_rational = surface.IsURational() or surface.IsVRational()
+        self.u_degree = bspline.UDegree()
+        self.v_degree = bspline.VDegree()
+        self.is_u_periodic = bspline.IsUPeriodic()
+        self.is_v_periodic = bspline.IsVPeriodic()
+        self.is_rational = bspline.IsURational() or bspline.IsVRational()
         
         # 控制点网格
-        u_poles = surface.NbUPoles()
-        v_poles = surface.NbVPoles()
+        u_poles = bspline.NbUPoles()
+        v_poles = bspline.NbVPoles()
         
         poles = np.zeros((u_poles, v_poles, 3), dtype=np.float64)
         weights = np.zeros((u_poles, v_poles), dtype=np.float64)
         
         for i in range(u_poles):
             for j in range(v_poles):
-                pole = surface.Pole(i + 1, j + 1)  # OCC索引从1开始
+                pole = bspline.Pole(i + 1, j + 1)  # OCC索引从1开始
                 poles[i, j] = self.coord_to_array(pole)
                 
                 if self.is_rational:
-                    weights[i, j] = surface.Weight(i + 1, j + 1)
+                    weights[i, j] = bspline.Weight(i + 1, j + 1)
                 else:
                     weights[i, j] = 1.0
         
@@ -79,25 +95,25 @@ class IGESNURBSSurface(IGESEntity):
         self.weights = weights
         
         # U方向节点
-        u_num_knots = surface.NbUKnots()
+        u_num_knots = bspline.NbUKnots()
         u_knots = np.zeros(u_num_knots, dtype=np.float64)
         u_mults = np.zeros(u_num_knots, dtype=np.int32)
         
         for i in range(u_num_knots):
-            u_knots[i] = surface.UKnot(i + 1)
-            u_mults[i] = surface.UMultiplicity(i + 1)
+            u_knots[i] = bspline.UKnot(i + 1)
+            u_mults[i] = bspline.UMultiplicity(i + 1)
         
         self.u_knots = u_knots
         self.u_multiplicities = u_mults
         
         # V方向节点
-        v_num_knots = surface.NbVKnots()
+        v_num_knots = bspline.NbVKnots()
         v_knots = np.zeros(v_num_knots, dtype=np.float64)
         v_mults = np.zeros(v_num_knots, dtype=np.int32)
         
         for i in range(v_num_knots):
-            v_knots[i] = surface.VKnot(i + 1)
-            v_mults[i] = surface.VMultiplicity(i + 1)
+            v_knots[i] = bspline.VKnot(i + 1)
+            v_mults[i] = bspline.VMultiplicity(i + 1)
         
         self.v_knots = v_knots
         self.v_multiplicities = v_mults
