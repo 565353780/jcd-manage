@@ -1,112 +1,219 @@
 import struct
+import numpy as np
+from typing import Tuple, Dict, Any
 
 from jcd_manage.Config.types import SurfaceType, DiamondType, BlockType, BoolType, CurveType
 
 
-def read_matrix(jcd_file, matrix_count):
+def read_matrix(jcd_file, matrix_count: int) -> np.ndarray:
+    """读取矩阵数据
+    
+    Args:
+        jcd_file: 文件对象
+        matrix_count: 矩阵数量
+        
+    Returns:
+        矩阵数组，形状为 (matrix_count, 4, 4)
+    """
+    matrices = np.zeros((matrix_count, 4, 4), dtype=np.float32)
+    
     for i in range(matrix_count):
-        print(f"matrix {i}:")
-        matrix = ''
         for j in range(4):
-            matrix += '['
             for k in range(4):
                 value = struct.unpack('<f', jcd_file.read(4))[0]
-                matrix += f'{value:.2f}, '
-            matrix += ']\n'
-        print(matrix)
-        #两个矩阵之间间隔4个字节
+                matrices[i, j, k] = value
+        
+        # 两个矩阵之间间隔4个字节
         if i != matrix_count - 1:
             unkown_data = jcd_file.read(4)
-            print(f"unkown_data: {unkown_data.hex()} {unkown_data}")
+    
+    return matrices
 
-def read_points(jcd_file):
+def read_points(jcd_file) -> np.ndarray:
+    """读取浮点数点数据
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        点数组，形状为 (point_size, 4)
+    """
     point_size = int.from_bytes(jcd_file.read(4), 'little')
-    print(f"point_size: {point_size}")
-
-    #点
+    
+    points = np.zeros((point_size, 4), dtype=np.float32)
     for i in range(point_size):
         point = struct.unpack('<ffff', jcd_file.read(16))
-        print(f"x: {point[0]:.2f}, y: {point[1]:.2f}, z: {point[2]:.2f}, w: {point[3]:.2f}")
+        points[i] = point
+    
+    return points
 
-def read_int_points(jcd_file):
+def read_int_points(jcd_file) -> np.ndarray:
+    """读取整数点数据（顶点索引）
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        整数点数组，形状为 (point_size, 4)
+    """
     point_size = int.from_bytes(jcd_file.read(4), 'little')
-    print(f"int point_size: {point_size}")
-
-    #点
+    
+    points = np.zeros((point_size, 4), dtype=np.int32)
     for i in range(point_size):
         point = struct.unpack('<iiii', jcd_file.read(16))
-        print(f"int point: {point}")
+        points[i] = point
+    
+    return points
 
-def read_material(jcd_file):
-    #材质名长度
+def read_material(jcd_file) -> str:
+    """读取材质名称
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        材质名称字符串
+    """
     material_name_size = int.from_bytes(jcd_file.read(4), 'little')
-    print(f"material_name_size: {material_name_size}")
-
-    #材质名
     material_name = jcd_file.read(material_name_size).decode('utf-8')
-    print(f"material_name: {material_name}")
+    return material_name
 
-#读取曲线点的数量和曲线数量，曲面的总控制点数量 = ring_count * original_point_count
-def read_ring_count(jcd_file):
+def read_ring_count(jcd_file) -> Tuple[int, int]:
+    """读取曲线点的数量和曲线数量
+    
+    曲面的总控制点数量 = ring_count * original_point_count
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        (ring_count, original_point_count) 元组
+    """
     ring_count = int.from_bytes(jcd_file.read(4), 'little')
     original_point_count = int.from_bytes(jcd_file.read(4), 'little')
-    print(f"curve count: {ring_count}, curve point count: {original_point_count}")
+    return ring_count, original_point_count
 
-def read_curve_type(jcd_file):
+def read_curve_type(jcd_file) -> CurveType:
+    """读取曲线类型
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        CurveType 枚举值
+    """
     curve_type = CurveType(int.from_bytes(jcd_file.read(1), 'little'))
-    print(f"curve_type: {curve_type}")
+    return curve_type
 
-#读取每个物体的矩阵
-def read_matrix_by_type(jcd_file, type: SurfaceType):
-    if type == SurfaceType.CURVE:
-        read_matrix(jcd_file, 2)
-    elif type == SurfaceType.SURFACE:
-        read_matrix(jcd_file, 2)
-    elif type == SurfaceType.FONT_SURFACE:
-        read_matrix(jcd_file, 2)
-    elif type == SurfaceType.BOOL_SURFACE:
-        read_matrix(jcd_file, 3)
-    elif type == SurfaceType.DIAMOND:
-        read_matrix(jcd_file, 2)
-    elif type == SurfaceType.GUIDE_LINE:
-        read_matrix(jcd_file, 1)
-    elif type == SurfaceType.QUAD_TYPE:
-        read_matrix(jcd_file, 2)
+def read_matrix_by_type(jcd_file, type: SurfaceType) -> np.ndarray:
+    """根据类型读取对应数量的矩阵
+    
+    Args:
+        jcd_file: 文件对象
+        type: 曲面类型
+        
+    Returns:
+        矩阵数组
+    """
+    matrix_count_map = {
+        SurfaceType.CURVE: 2,
+        SurfaceType.SURFACE: 2,
+        SurfaceType.FONT_SURFACE: 2,
+        SurfaceType.BOOL_SURFACE: 3,
+        SurfaceType.DIAMOND: 2,
+        SurfaceType.GUIDE_LINE: 1,
+        SurfaceType.QUAD_TYPE: 2,
+    }
+    
+    matrix_count = matrix_count_map.get(type, 0)
+    if matrix_count > 0:
+        return read_matrix(jcd_file, matrix_count)
+    return np.array([])
 
-#曲线
-def read_curve(jcd_file):
-    read_material(jcd_file)
-    read_points(jcd_file)
-    read_ring_count(jcd_file)
-    read_curve_type(jcd_file)
-
+def read_curve(jcd_file) -> Dict[str, Any]:
+    """读取曲线数据
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        包含曲线数据的字典
+    """
+    material_name = read_material(jcd_file)
+    points = read_points(jcd_file)
+    ring_count, original_point_count = read_ring_count(jcd_file)
+    curve_type = read_curve_type(jcd_file)
+    
     unkown_data = jcd_file.read(9)
-    print(f"unkown_data: {unkown_data.hex()}")
+    
+    return {
+        'material_name': material_name,
+        'points': points,
+        'ring_count': ring_count,
+        'original_point_count': original_point_count,
+        'curve_type': curve_type,
+        'unknown_data': unkown_data
+    }
 
-#曲面
-def read_surface(jcd_file):
-    read_material(jcd_file)
-    read_points(jcd_file)
-    read_ring_count(jcd_file)
-    read_curve_type(jcd_file)
-
+def read_surface(jcd_file) -> Dict[str, Any]:
+    """读取曲面数据
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        包含曲面数据的字典
+    """
+    material_name = read_material(jcd_file)
+    points = read_points(jcd_file)
+    ring_count, original_point_count = read_ring_count(jcd_file)
+    curve_type = read_curve_type(jcd_file)
+    
     unkown_data = jcd_file.read(49)
-    print(f"unkown_data: {unkown_data.hex()}")
+    
+    return {
+        'material_name': material_name,
+        'points': points,
+        'ring_count': ring_count,
+        'original_point_count': original_point_count,
+        'curve_type': curve_type,
+        'unknown_data': unkown_data
+    }
 
-#钻石
-def read_diamond(jcd_file):
-    read_material(jcd_file)
-    read_matrix(jcd_file, 1)
-    diamond_type = int.from_bytes(jcd_file.read(1), 'little')
-    print(f"diamond_type: {DiamondType(diamond_type)}")
+def read_diamond(jcd_file) -> Dict[str, Any]:
+    """读取钻石数据
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        包含钻石数据的字典
+    """
+    material_name = read_material(jcd_file)
+    matrix = read_matrix(jcd_file, 1)
+    diamond_type = DiamondType(int.from_bytes(jcd_file.read(1), 'little'))
     unkown_data = jcd_file.read(3)
-    print(f"unkown_data: {unkown_data.hex()}")
+    
+    return {
+        'material_name': material_name,
+        'matrix': matrix,
+        'diamond_type': diamond_type,
+        'unknown_data': unkown_data
+    }
 
-#字体面片
-def read_font_surface(jcd_file):
-    read_material(jcd_file)
-    read_matrix(jcd_file, 1)
-    outline_count = int.from_bytes(jcd_file.read(4), 'little') #轮廓数量
+def read_font_surface(jcd_file) -> Dict[str, Any]:
+    """读取字体面片数据
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        包含字体面片数据的字典
+    """
+    material_name = read_material(jcd_file)
+    matrix = read_matrix(jcd_file, 1)
+    
+    outline_count = int.from_bytes(jcd_file.read(4), 'little')
     type2 = int.from_bytes(jcd_file.read(4), 'little')
     type3 = int.from_bytes(jcd_file.read(4), 'little')
     type4 = int.from_bytes(jcd_file.read(4), 'little')
@@ -114,59 +221,137 @@ def read_font_surface(jcd_file):
     background_type = BlockType(int.from_bytes(jcd_file.read(4), 'little'))
     thickness = struct.unpack('<f', jcd_file.read(4))[0]
     radius = struct.unpack('<f', jcd_file.read(4))[0]
-    print(f"outline_count: {outline_count}, type2: {type2}, type3: {type3}, type4: {type4}, foreground_type: {foreground_type}, background_type: {background_type}, thickness: {thickness}, radius: {radius}")
-
-    #轮廓点
+    
+    # 读取轮廓大小
+    outline_sizes = np.zeros(outline_count, dtype=np.int32)
     point_size = 0
     for i in range(outline_count):
         size = int.from_bytes(jcd_file.read(4), 'little')
         unkown_data = jcd_file.read(4)
-        print(f"outline {i} size: {size}, unkown_data: {unkown_data.hex()}")
+        outline_sizes[i] = size
         point_size += size
-
+    
+    # 读取所有轮廓点
+    points = np.zeros((point_size, 3), dtype=np.float32)
     for i in range(point_size):
         point = struct.unpack('<fff', jcd_file.read(12))
-        print(f"x: {point[0]:.2f}, y: {point[1]:.2f}, z: {point[2]:.2f}")
+        points[i] = point
+    
+    return {
+        'material_name': material_name,
+        'matrix': matrix,
+        'outline_count': outline_count,
+        'type2': type2,
+        'type3': type3,
+        'type4': type4,
+        'foreground_type': foreground_type,
+        'background_type': background_type,
+        'thickness': thickness,
+        'radius': radius,
+        'outline_sizes': outline_sizes,
+        'points': points
+    }
 
-#辅助线
-def read_guide_line(jcd_file):
-    read_matrix(jcd_file, 1)
+def read_guide_line(jcd_file) -> Dict[str, Any]:
+    """读取辅助线数据
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        包含辅助线数据的字典
+    """
+    matrix = read_matrix(jcd_file, 1)
     unkown_data1 = jcd_file.read(4)
     unkwon_data2 = int.from_bytes(jcd_file.read(4), 'little')
     unkown_data3 = int.from_bytes(jcd_file.read(4), 'little')
-    print(f"unkown_data1: {unkown_data1.hex()}, unkwon_data2: {unkwon_data2}, unkown_data3: {unkown_data3}")
+    
+    return {
+        'matrix': matrix,
+        'unknown_data1': unkown_data1,
+        'unknown_data2': unkwon_data2,
+        'unknown_data3': unkown_data3
+    }
 
-#布尔曲面
-def read_bool_surface(jcd_file):
-    bool_type = BoolType(int.from_bytes(jcd_file.read(1), 'little')) #bool类型
-    unkown_data = jcd_file.read(2)
-    print(f"bool_type: {bool_type}")
-    print(f"unkown_data: {unkown_data.hex()}")
-    surface_type = SurfaceType(int.from_bytes(jcd_file.read(1), 'little')) #32代表bool 曲面，3代表普通曲面
-    unkown_data = jcd_file.read(7)
-    print(f"unkown_data: {unkown_data.hex()}")
-    print(f"surface_type: {surface_type}")
-    read_by_surface_type(jcd_file, surface_type)
+def read_bool_surface(jcd_file) -> Dict[str, Any]:
+    """读取布尔曲面数据
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        包含布尔曲面数据的字典
+    """
+    bool_type = BoolType(int.from_bytes(jcd_file.read(1), 'little'))
+    unkown_data1 = jcd_file.read(2)
+    surface_type = SurfaceType(int.from_bytes(jcd_file.read(1), 'little'))
+    unkown_data2 = jcd_file.read(7)
+    
+    # 递归读取子曲面
+    sub_surface_data = read_by_surface_type(jcd_file, surface_type)
+    
+    return {
+        'bool_type': bool_type,
+        'unknown_data1': unkown_data1,
+        'surface_type': surface_type,
+        'unknown_data2': unkown_data2,
+        'sub_surface': sub_surface_data
+    }
 
-#四边形面片
-def read_quad_type(jcd_file):
-    read_material(jcd_file)
-    read_points(jcd_file)
-    read_int_points(jcd_file) #顶点索引
+def read_quad_type(jcd_file) -> Dict[str, Any]:
+    """读取四边形面片数据
+    
+    Args:
+        jcd_file: 文件对象
+        
+    Returns:
+        包含四边形面片数据的字典
+    """
+    material_name = read_material(jcd_file)
+    points = read_points(jcd_file)
+    indices = read_int_points(jcd_file)  # 顶点索引
+    
+    return {
+        'material_name': material_name,
+        'points': points,
+        'indices': indices
+    }
 
-def read_by_surface_type(jcd_file, surface_type: SurfaceType):
-    read_matrix_by_type(jcd_file, surface_type)
+
+def read_by_surface_type(jcd_file, surface_type: SurfaceType) -> Dict[str, Any]:
+    """根据曲面类型读取对应数据
+    
+    Args:
+        jcd_file: 文件对象
+        surface_type: 曲面类型
+        
+    Returns:
+        包含曲面数据的字典，包括矩阵和类型特定数据
+    """
+    # 读取矩阵
+    matrices = read_matrix_by_type(jcd_file, surface_type)
+    
+    # 根据类型读取特定数据
+    type_data = {}
+    
     if surface_type == SurfaceType.CURVE:
-        read_curve(jcd_file)
+        type_data = read_curve(jcd_file)
     elif surface_type == SurfaceType.SURFACE:
-        read_surface(jcd_file)
+        type_data = read_surface(jcd_file)
     elif surface_type == SurfaceType.BOOL_SURFACE:
-        read_bool_surface(jcd_file)
+        type_data = read_bool_surface(jcd_file)
     elif surface_type == SurfaceType.DIAMOND:
-        read_diamond(jcd_file)
+        type_data = read_diamond(jcd_file)
     elif surface_type == SurfaceType.FONT_SURFACE:
-        read_font_surface(jcd_file)
+        type_data = read_font_surface(jcd_file)
     elif surface_type == SurfaceType.GUIDE_LINE:
-        read_guide_line(jcd_file)
+        type_data = read_guide_line(jcd_file)
     elif surface_type == SurfaceType.QUAD_TYPE:
-        read_quad_type(jcd_file)
+        type_data = read_quad_type(jcd_file)
+    
+    # 合并矩阵和类型数据
+    return {
+        'surface_type': surface_type,
+        'matrices': matrices,
+        **type_data
+    }
