@@ -26,10 +26,10 @@ class JCDDiamond(JCDBaseData):
         # 钻石的matrix字段是单独的，不同于matrices
         if 'matrix' in data and len(data['matrix']) > 0:
             self.matrix = data['matrix'][0]  # 取第一个矩阵
-        
+
         self.diamond_type = data.get('diamond_type')
         self.unknown_data = data.get('unknown_data', b'')
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         data = super().to_dict()
@@ -40,45 +40,15 @@ class JCDDiamond(JCDBaseData):
             'unknown_data': self.unknown_data,
         })
         return data
-    
+
     def get_position(self) -> np.ndarray:
         """从变换矩阵获取位置
-        
+
         Returns:
             3D位置向量
         """
-        return self.matrix[:3, 3]
-    
-    def get_scale(self) -> np.ndarray:
-        """从变换矩阵获取缩放
-        
-        Returns:
-            3D缩放向量（近似值）
-        """
-        scale_x = np.linalg.norm(self.matrix[:3, 0])
-        scale_y = np.linalg.norm(self.matrix[:3, 1])
-        scale_z = np.linalg.norm(self.matrix[:3, 2])
-        return np.array([scale_x, scale_y, scale_z])
-    
-    def get_rotation_matrix(self) -> np.ndarray:
-        """从变换矩阵获取旋转矩阵
-        
-        Returns:
-            3x3旋转矩阵（归一化后）
-        """
-        scale = self.get_scale()
-        rotation = self.matrix[:3, :3].copy()
-        
-        # 归一化以去除缩放
-        if scale[0] != 0:
-            rotation[:, 0] /= scale[0]
-        if scale[1] != 0:
-            rotation[:, 1] /= scale[1]
-        if scale[2] != 0:
-            rotation[:, 2] /= scale[2]
-        
-        return rotation
-    
+        return self.matrix[3, :3]
+
     def get_diamond_type_name(self) -> str:
         """获取钻石类型名称"""
         if self.diamond_type is None:
@@ -94,32 +64,32 @@ class JCDDiamond(JCDBaseData):
             DiamondType.TRIANGLE: "三角",
         }
         return type_names.get(self.diamond_type, str(self.diamond_type))
-    
+
     def get_points(self) -> Optional[np.ndarray]:
         """获取钻石的中心点（用于可视化）
-        
+
         Returns:
             中心点数组 (1, 3)
         """
         # 钻石用位置作为其"点"
         position = self.get_position()
         return position.reshape(1, 3)
-    
+
     def get_transform_matrix(self) -> np.ndarray:
         """获取完整的变换矩阵（包括自身matrix和继承的matrices）
-        
+
         Returns:
             4x4变换矩阵
         """
         # 从自身的matrix开始
         result = self.matrix.copy()
-        
+
         # 应用继承自基类的所有变换矩阵
         for matrix in self.matrices:
             result = matrix @ result
-        
+
         return result
-    
+
     def __repr__(self):
         return (f"JCDDiamond(material='{self.material_name}', "
                 f"type={self.get_diamond_type_name()}, "

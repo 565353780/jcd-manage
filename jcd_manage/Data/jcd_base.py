@@ -109,15 +109,13 @@ class JCDBaseData:
 
         transformed = homogeneous.copy()
 
-        '''
         # 合并所有变换矩阵
         final_matrix = np.eye(4)  # 4x4 单位矩阵，作为起始矩阵
-        for matrix in self.matrices:
+        for matrix in self.matrices[0:1]:
             final_matrix = matrix @ final_matrix  # 逐步合并变换矩阵
 
         # 应用合并后的变换矩阵
         transformed = transformed @ final_matrix.T
-        '''
 
         # 返回3D坐标
         return transformed[:, :3]

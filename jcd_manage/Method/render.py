@@ -74,8 +74,7 @@ class JCDRenderer:
         
         geometries = []
         
-        # 使用get_transformed_points()获取变换后的点
-        points_3d = curve.get_transformed_points()
+        points_3d = curve.get_points()
         if points_3d is None or len(points_3d) < 2:
             return geometries
         
@@ -103,28 +102,34 @@ class JCDRenderer:
     def _create_surface_geometry(self, surface: JCDSurface, color: Optional[List[float]] = None,
                                 show_wireframe: bool = True) -> List[o3d.geometry.Geometry]:
         """创建曲面几何体
-        
+
         Args:
             surface: JCDSurface对象
             color: 颜色RGB，默认使用预设颜色
             show_wireframe: 是否显示网格线
-            
+
         Returns:
             几何体列表
         """
         if color is None:
             color = self.COLORS['surface']
-        
+
         geometries = []
-        
-        # 获取变换后的所有点
-        all_points = surface.get_transformed_points()
+
+        all_points = surface.get_points()
+        bbox_min, bbox_max = surface.get_bounding_box()
+
+        bbox_bound = np.max(bbox_max - bbox_min)
+        if bbox_bound < 22:
+            return geometries
+        print(bbox_bound)
+
         if all_points is None or surface.u_count() == 0 or surface.v_count() == 0:
             return geometries
-        
+
         # 重构网格结构
         grid = all_points.reshape(surface.u_count(), surface.v_count(), 3)
-        
+
         # 创建网格线（U方向和V方向）
         if show_wireframe:
             # U方向曲线
@@ -136,7 +141,7 @@ class JCDRenderer:
                 line_set.lines = o3d.utility.Vector2iVector(lines)
                 line_set.paint_uniform_color(color)
                 geometries.append(line_set)
-            
+
             # V方向曲线
             for j in range(surface.v_count()):
                 points_3d = grid[:, j, :]
@@ -146,56 +151,55 @@ class JCDRenderer:
                 line_set.lines = o3d.utility.Vector2iVector(lines)
                 line_set.paint_uniform_color(color)
                 geometries.append(line_set)
-        
+
         return geometries
-    
+
     def _create_diamond_geometry(self, diamond: JCDDiamond, color: Optional[List[float]] = None) -> List[o3d.geometry.Geometry]:
         """创建钻石几何体
-        
+
         Args:
             diamond: JCDDiamond对象
             color: 颜色RGB，默认使用预设颜色
-            
+
         Returns:
             几何体列表
         """
         if color is None:
             color = self.COLORS['diamond']
-        
+
         geometries = []
-        
+
         # 根据钻石类型创建不同的几何体
         # 这里使用简化的表示：一个球体
         sphere = o3d.geometry.TriangleMesh.create_sphere(radius=1.0, resolution=20)
         sphere.paint_uniform_color(color)
         sphere.compute_vertex_normals()
-        
+
         # 应用钻石的完整变换矩阵
-        transform_matrix = diamond.get_transform_matrix()
+        transform_matrix = diamond.matrix.T
         sphere.transform(transform_matrix)
-        
+
         geometries.append(sphere)
-        
+
         return geometries
-    
+
     def _create_font_surface_geometry(self, font_surface: JCDFontSurface, 
                                      color: Optional[List[float]] = None) -> List[o3d.geometry.Geometry]:
         """创建字体面片几何体
-        
+
         Args:
             font_surface: JCDFontSurface对象
             color: 颜色RGB，默认使用预设颜色
-            
+
         Returns:
             几何体列表
         """
         if color is None:
             color = self.COLORS['font_surface']
-        
+
         geometries = []
         
-        # 使用get_transformed_points()获取变换后的所有点
-        all_points = font_surface.get_transformed_points()
+        all_points = font_surface.get_points()
         if all_points is None or len(all_points) == 0:
             return geometries
         
@@ -246,8 +250,7 @@ class JCDRenderer:
         
         geometries = []
         
-        # 使用get_transformed_points()获取变换后的起点和终点
-        points = guide_line.get_transformed_points()
+        points = guide_line.get_points()
         if points is None or len(points) < 2:
             return geometries
         
@@ -276,8 +279,7 @@ class JCDRenderer:
         
         geometries = []
         
-        # 使用get_transformed_points()获取变换后的点
-        points = bool_surface.get_transformed_points()
+        points = bool_surface.get_points()
         if points is not None and len(points) > 0:
             # 创建点云表示
             pcd = o3d.geometry.PointCloud()
@@ -308,8 +310,7 @@ class JCDRenderer:
         if quad_type.num_vertices() == 0 or quad_type.num_quads() == 0:
             return geometries
         
-        # 使用get_transformed_points()获取变换后的顶点
-        vertices = quad_type.get_transformed_points()
+        vertices = quad_type.get_points()
         if vertices is None:
             return geometries
         

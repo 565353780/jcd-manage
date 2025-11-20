@@ -1,9 +1,9 @@
 from jcd_manage.Module.jcd_loader import JCDLoader
 
 def demo():
-    jcd_txt_file_path = '/Users/chli/Downloads/001_0001.jcd'
+    jcd_txt_file_path = '/Users/chli/Downloads/001_0002.jcd'
     output_info = False
-    save_txt_file_path = '/Users/chli/Downloads/001_0001.txt'
+    save_txt_file_path = '/Users/chli/Downloads/001_0002.txt'
     overwrite = True
 
     jcd_loader = JCDLoader(jcd_txt_file_path, output_info)

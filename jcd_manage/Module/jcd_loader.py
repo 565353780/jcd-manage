@@ -211,10 +211,11 @@ class JCDLoader(object):
         return overall_min, overall_max
 
     def renderAllData(self) -> bool:
+        print(len(self.get_surfaces()))
         groups = [
             (self.get_curves(), [1.0, 0.0, 0.0]),      # 红色曲线
             (self.get_surfaces(), [0.0, 1.0, 0.0]),    # 绿色曲面
-            # (self.get_diamonds(), [1.0, 0.84, 0.0]),   # 金色钻石
+            (self.get_diamonds(), [1.0, 0.84, 0.0]),   # 金色钻石
         ]
         renderMultipleGroups(groups)
         return True
