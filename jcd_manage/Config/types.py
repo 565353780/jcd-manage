@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 
 
 class SurfaceType(Enum):
@@ -38,3 +38,13 @@ class BoolType(Enum):
 class CurveType(Enum):
     OPEN_CURVE = 0 # 开放曲线
     CLOSED_CURVE = 1 # 闭合曲线
+
+class DAGNodeType(Enum):
+    PRIMITIVE = auto()
+    GROUP = auto()
+    BOOLEAN = auto()
+
+class DAGBoolType(Enum):
+    UNION = "union"
+    INTERSECT = "intersect"
+    DIFFERENCE = "difference"
