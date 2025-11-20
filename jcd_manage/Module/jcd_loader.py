@@ -1,8 +1,8 @@
 import os
-from typing import Union, List
+from typing import Union, List, Optional
 
 from jcd_manage.Config.constant import JCD_HEADER
-from jcd_manage.Config.types import SurfaceType
+from jcd_manage.Config.types import SurfaceType, BoolType, DAGBoolType
 from jcd_manage.Data import (
     JCDCurve, JCDSurface, JCDDiamond, JCDFontSurface, 
     JCDGuideLine, JCDBoolSurface, JCDQuadType, JCDBaseData
@@ -55,6 +55,8 @@ class JCDLoader(object):
 
         # 存储所有实体数据
         self.objects = []
+        # 当前正在构建的布尔曲面
+        current_bool_surface: Optional[JCDBoolSurface] = None
 
         with open(jcd_file_path, 'rb') as jcd_file:
             # 读取并验证文件头
@@ -75,11 +77,17 @@ class JCDLoader(object):
                 flag_char = chr(end_flag[-1])
 
                 if flag_char == ':':
+                    # 正常的曲面开始标志
                     pass
                 elif flag_char == '#':
+                    # 文件结束标志
                     break
                 elif flag_char == '%':
-                    # 前一个bool曲面的结束标志
+                    # 布尔曲面的结束标志
+                    if current_bool_surface is not None:
+                        # 完成当前布尔曲面的构建，添加到对象列表
+                        self.objects.append(current_bool_surface)
+                        current_bool_surface = None
                     continue
                 else:
                     print(f"未知标志位: {end_flag.hex()}")
@@ -97,16 +105,65 @@ class JCDLoader(object):
                 entity_data['meta_info'] = meta_info
                 entity_data['hide'] = hide
 
-                # 转换为数据类实例
-                entity_class = self.TYPE_CLASS_MAP.get(surface_type, JCDBaseData)
-                entity_instance = entity_class.from_dict(entity_data)
+                # 处理布尔曲面的特殊逻辑
+                if surface_type == SurfaceType.BOOL_SURFACE:
+                    # 创建一个新的布尔曲面对象
+                    current_bool_surface = JCDBoolSurface()
+                    current_bool_surface._load_from_dict(entity_data)
 
-                # 保存到列表
-                self.objects.append(entity_instance)
+                    if output_info:
+                        print(f"创建新的布尔曲面，类型: {current_bool_surface.get_bool_type_name()}")
 
+                    # 不立即添加到objects列表，等待处理子曲面
+                elif current_bool_surface is not None:
+                    # 如果当前正在构建布尔曲面，则将此曲面添加为子曲面
+                    # 确定布尔操作类型映射
+                    bool_type_mapping = {
+                        BoolType.UNION: DAGBoolType.UNION,
+                        BoolType.INTERSECTION: DAGBoolType.INTERSECT,
+                        BoolType.DIFFERENCE: DAGBoolType.DIFFERENCE
+                    }
+
+                    # 将曲面添加到DAG中
+                    surface_node_id = current_bool_surface.add_surface(entity_data)
+
+                    if output_info:
+                        print(f"  添加子曲面到布尔曲面，节点ID: {surface_node_id}")
+
+                    # 如果是第二个及以后的子曲面，应用布尔操作
+                    if current_bool_surface.get_surface_count() > 1:
+                        # 获取上一个根节点ID
+                        prev_root_id = current_bool_surface.get_root_node_id()
+                        # 应用布尔操作，默认使用UNION
+                        bool_type = bool_type_mapping.get(current_bool_surface.bool_type, DAGBoolType.UNION)
+                        # 创建布尔操作节点，将新曲面与之前的结果进行操作
+                        bool_node_id = current_bool_surface.apply_boolean_operation(
+                            bool_type,
+                            prev_root_id,
+                            surface_node_id
+                        )
+
+                        if output_info:
+                            print(f"  应用布尔操作: {bool_type.value}, 结果节点ID: {bool_node_id}")
+                else:
+                    # 普通曲面，正常处理
+                    # 转换为数据类实例
+                    entity_class = self.TYPE_CLASS_MAP.get(surface_type, JCDBaseData)
+                    entity_instance = entity_class.from_dict(entity_data)
+
+                    # 保存到列表
+                    self.objects.append(entity_instance)
+
+                    if output_info:
+                        # 打印摘要
+                        print_entity_summary(entity_data)
+
+            # 处理可能未闭合的布尔曲面
+            if current_bool_surface is not None:
+                self.objects.append(current_bool_surface)
                 if output_info:
-                    # 打印摘要
-                    print_entity_summary(entity_data)
+                    print(f"布尔曲面处理完成，添加到对象列表")
+                    current_bool_surface.print_dag_structure()
 
         if output_info:
             # 打印总体统计
@@ -234,6 +291,17 @@ class JCDLoader(object):
         type_counter = Counter(obj.surface_type for obj in self.objects)
         for surf_type, count in type_counter.items():
             print(f"  {surf_type}: {count}")
+        
+        # 打印布尔曲面的详细信息
+        bool_surfaces = self.get_by_type(SurfaceType.BOOL_SURFACE)
+        if bool_surfaces:
+            print(f"\n布尔曲面详情:")
+            for i, bool_surf in enumerate(bool_surfaces, 1):
+                print(f"  布尔曲面 {i}:")
+                print(f"    类型: {bool_surf.get_bool_type_name()}")
+                print(f"    曲面数量: {bool_surf.get_surface_count()}")
+                print(f"    根节点ID: {bool_surf.get_root_node_id()}")
+                print(f"    隐藏状态: {bool_surf.hide}")
 
         # 边界框
         bbox = self.get_overall_bounding_box()
@@ -246,3 +314,21 @@ class JCDLoader(object):
             print(f"  尺寸: [{size[0]:.2f}, {size[1]:.2f}, {size[2]:.2f}]")
 
         print(f"{'='*60}\n")
+    
+    def get_bool_surfaces(self) -> List[JCDBoolSurface]:
+        """获取所有布尔曲面"""
+        return [obj for obj in self.objects if isinstance(obj, JCDBoolSurface)]
+    
+    def render_bool_surfaces(self) -> bool:
+        """渲染布尔曲面的DAG结构"""
+        bool_surfaces = self.get_bool_surfaces()
+        if not bool_surfaces:
+            print("没有找到布尔曲面")
+            return False
+        
+        print(f"渲染 {len(bool_surfaces)} 个布尔曲面的DAG结构:")
+        for i, bool_surf in enumerate(bool_surfaces, 1):
+            print(f"\n布尔曲面 {i}:")
+            bool_surf.print_dag_structure()
+        
+        return True
