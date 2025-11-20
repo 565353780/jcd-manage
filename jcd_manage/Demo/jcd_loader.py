@@ -7,5 +7,6 @@ def demo():
     overwrite = True
 
     jcd_loader = JCDLoader(jcd_txt_file_path, output_info)
+    jcd_loader.renderAllData()
     jcd_loader.saveAsTXTFile(save_txt_file_path, overwrite)
     return True

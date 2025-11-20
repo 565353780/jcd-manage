@@ -10,6 +10,7 @@ from jcd_manage.Data import (
 from jcd_manage.Method.io import read_by_surface_type, save_entities_to_text
 from jcd_manage.Method.info import print_entity_summary, print_overall_summary
 from jcd_manage.Method.path import createFileFolder, removeFile
+from jcd_manage.Method.render import renderMultipleGroups
 
 
 
@@ -208,6 +209,15 @@ class JCDLoader(object):
         overall_max = np.max(np.array(all_max_points), axis=0)
 
         return overall_min, overall_max
+
+    def renderAllData(self) -> bool:
+        groups = [
+            (self.get_curves(), [1.0, 0.0, 0.0]),      # 红色曲线
+            (self.get_surfaces(), [0.0, 1.0, 0.0]),    # 绿色曲面
+            # (self.get_diamonds(), [1.0, 0.84, 0.0]),   # 金色钻石
+        ]
+        renderMultipleGroups(groups)
+        return True
 
     def print_summary(self):
         """打印摘要信息"""
