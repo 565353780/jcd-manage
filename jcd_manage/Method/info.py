@@ -10,9 +10,6 @@ def print_entity_summary(entity_data: Dict[str, Any]) -> bool:
     print(f"\n实体摘要:")
     print(f"  类型: {surface_type}")
     print(f"  隐藏: {hide}")
-    if hide:
-        print("!!!!!!!!!")
-        exit()
 
     if 'matrices' in entity_data and len(entity_data['matrices']) > 0:
         print(f"  矩阵数量: {len(entity_data['matrices'])}")
