@@ -8,10 +8,10 @@ from jcd_manage.Data.dag import CSGDAG, PrimitiveSurface, SurfaceGroup, BooleanO
 
 class JCDBoolSurface(JCDBaseData):
     """JCD布尔曲面类 - 基于DAG结构
-    
+
     使用CSGDAG实现多曲面的布尔操作，支持复杂的布尔运算树结构
     """
-    
+
     def __init__(self):
         super().__init__()
         self.bool_type: Optional[BoolType] = None  # 布尔操作类型
@@ -27,12 +27,6 @@ class JCDBoolSurface(JCDBaseData):
         self.unknown_data1 = data.get('unknown_data1', b'')
         self.surface_count = data.get('surface_count', 0)
 
-        # 重建DAG结构
-        if 'dag_nodes' in data:
-            # 这里简化处理，实际应该重建完整的DAG结构
-            # 在loader中会动态添加节点
-            pass
-    
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         data = super().to_dict()
@@ -43,7 +37,7 @@ class JCDBoolSurface(JCDBaseData):
             'root_node_id': self.root_node_id,
         })
         return data
-    
+
     def add_surface(self, surface_data: Dict[str, Any]) -> int:
         """添加一个原始曲面对象到DAG中
 
@@ -57,26 +51,26 @@ class JCDBoolSurface(JCDBaseData):
         primitive_node = PrimitiveSurface(surface_data)
         node_id = self.dag.add(primitive_node)
         self.surface_count += 1
-        
+
         # 如果是第一个曲面，设置为根节点
         if self.root_node_id is None:
             self.root_node_id = node_id
-        
+
         return node_id
-    
+
     def create_surface_group(self, node_ids: List[int]) -> int:
         """创建曲面组节点
-        
+
         Args:
             node_ids: 要组合的节点ID列表
-            
+
         Returns:
             创建的组节点ID
         """
         group_node = SurfaceGroup(node_ids)
         node_id = self.dag.add(group_node)
         return node_id
-    
+
     def apply_boolean_operation(self, bool_type: DAGBoolType, left_id: int, right_id: int) -> int:
         """应用布尔操作
         

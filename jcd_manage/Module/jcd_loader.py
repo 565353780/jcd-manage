@@ -57,6 +57,7 @@ class JCDLoader(object):
         self.objects = []
         # 当前正在构建的布尔曲面
         current_bool_surface: Optional[JCDBoolSurface] = None
+        bool_operation_stack : List[(BoolType, List[int])] = []
 
         with open(jcd_file_path, 'rb') as jcd_file:
             # 读取并验证文件头
@@ -83,11 +84,28 @@ class JCDLoader(object):
                     # 文件结束标志
                     break
                 elif flag_char == '%':
-                    # 布尔曲面的结束标志
-                    if current_bool_surface is not None:
-                        # 完成当前布尔曲面的构建，添加到对象列表
+                    # 开始构建bool曲面节点
+                    bool_type_mapping = {
+                        BoolType.UNION: DAGBoolType.UNION,
+                        BoolType.INTERSECTION: DAGBoolType.INTERSECT,
+                        BoolType.DIFFERENCE: DAGBoolType.DIFFERENCE
+                    }
+                    bool_operation_element = bool_operation_stack.pop() #弹出栈顶元素，标记上一个bool操作结束
+                    root_node_id = None
+                    for node_id in bool_operation_element[1]:
+                        if root_node_id is None:
+                            root_node_id = node_id
+                        else:
+                            bool_node_id = current_bool_surface.apply_boolean_operation(bool_type_mapping.get(bool_operation_element[0], DAGBoolType.UNION), root_node_id, node_id)
+                            root_node_id = bool_node_id
+
+                    if len(bool_operation_stack) == 0:
+                        # 所有bool操作结束，添加到对象列表
                         self.objects.append(current_bool_surface)
                         current_bool_surface = None
+                    else:
+                        # 将root节点添加到栈顶元素的子节点列表中
+                        bool_operation_stack[-1][1].append(root_node_id)
                     continue
                 else:
                     print(f"未知标志位: {end_flag.hex()}")
@@ -108,43 +126,30 @@ class JCDLoader(object):
                 # 处理布尔曲面的特殊逻辑
                 if surface_type == SurfaceType.BOOL_SURFACE:
                     # 创建一个新的布尔曲面对象
-                    current_bool_surface = JCDBoolSurface()
-                    current_bool_surface._load_from_dict(entity_data)
+                    if current_bool_surface == None:
+                        current_bool_surface = JCDBoolSurface()
+                        current_bool_surface._load_from_dict(entity_data)
+                    # 读取到最底层曲面
+                    while True:
+                        bool_operation_stack.append((entity_data['bool_type'], []))
+                        entity_data = entity_data['sub_surface'] #取出子曲面的实际数据，矩阵信息被舍弃
+
+                        if not 'bool_type' in entity_data:
+                            break
 
                     if output_info:
                         print(f"创建新的布尔曲面，类型: {current_bool_surface.get_bool_type_name()}")
 
-                    # 不立即添加到objects列表，等待处理子曲面
-                elif current_bool_surface is not None:
+                if current_bool_surface is not None:
                     # 如果当前正在构建布尔曲面，则将此曲面添加为子曲面
                     # 确定布尔操作类型映射
-                    bool_type_mapping = {
-                        BoolType.UNION: DAGBoolType.UNION,
-                        BoolType.INTERSECTION: DAGBoolType.INTERSECT,
-                        BoolType.DIFFERENCE: DAGBoolType.DIFFERENCE
-                    }
 
                     # 将曲面添加到DAG中
                     surface_node_id = current_bool_surface.add_surface(entity_data)
+                    bool_operation_stack[-1][1].append(surface_node_id)
 
                     if output_info:
                         print(f"  添加子曲面到布尔曲面，节点ID: {surface_node_id}")
-
-                    # 如果是第二个及以后的子曲面，应用布尔操作
-                    if current_bool_surface.get_surface_count() > 1:
-                        # 获取上一个根节点ID
-                        prev_root_id = current_bool_surface.get_root_node_id()
-                        # 应用布尔操作，默认使用UNION
-                        bool_type = bool_type_mapping.get(current_bool_surface.bool_type, DAGBoolType.UNION)
-                        # 创建布尔操作节点，将新曲面与之前的结果进行操作
-                        bool_node_id = current_bool_surface.apply_boolean_operation(
-                            bool_type,
-                            prev_root_id,
-                            surface_node_id
-                        )
-
-                        if output_info:
-                            print(f"  应用布尔操作: {bool_type.value}, 结果节点ID: {bool_node_id}")
                 else:
                     # 普通曲面，正常处理
                     # 转换为数据类实例
