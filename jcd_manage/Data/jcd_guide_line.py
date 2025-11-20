@@ -60,6 +60,41 @@ class JCDGuideLine(JCDBaseData):
             return direction / norm
         return np.array([0, 0, 1])
     
+    def get_points(self) -> Optional[np.ndarray]:
+        """获取辅助线的起点和终点（沿Z轴）
+        
+        Returns:
+            点数组 (2, 3) - [起点, 终点]
+        """
+        # 在局部坐标系中，沿Z轴定义一条线
+        length = 10.0  # 默认长度
+        start = np.array([0.0, 0.0, -length / 2])
+        end = np.array([0.0, 0.0, length / 2])
+        return np.vstack([start, end])
+    
+    def get_transformed_points(self) -> Optional[np.ndarray]:
+        """获取应用变换后的点数据（包括自身matrix和继承的matrices）
+        
+        Returns:
+            变换后的点数组 (2, 3) 或 None
+        """
+        points = self.get_points()
+        if points is None:
+            return None
+        
+        # 转换为齐次坐标
+        homogeneous = np.hstack([points, np.ones((len(points), 1))])
+        
+        # 先应用自身的matrix
+        transformed = (self.matrix @ homogeneous.T).T
+        
+        # 再应用继承自基类的所有变换矩阵
+        for matrix in self.matrices:
+            transformed = (matrix @ transformed.T).T
+        
+        # 返回3D坐标
+        return transformed[:, :3]
+    
     def __repr__(self):
         return (f"JCDGuideLine(position={self.get_position()}, "
                 f"direction={self.get_direction()}, "

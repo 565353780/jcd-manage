@@ -83,6 +83,17 @@ class JCDBoolSurface(JCDBaseData):
         max_point = np.max(points[:, :3], axis=0)
         return min_point, max_point
     
+    def get_points(self) -> Optional[np.ndarray]:
+        """获取子曲面的原始点数据
+        
+        Returns:
+            点数组 (n, 3) 或 None
+        """
+        points = self.get_sub_surface_points()
+        if points is None or len(points) == 0:
+            return None
+        return points[:, :3]
+    
     def __repr__(self):
         sub_type = self.sub_surface_type if self.sub_surface_type else "None"
         return (f"JCDBoolSurface(bool_type={self.get_bool_type_name()}, "

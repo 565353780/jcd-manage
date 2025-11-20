@@ -79,5 +79,48 @@ class JCDBaseData:
         else:
             self.matrices = matrix.reshape(1, 4, 4)
 
+    def get_points(self) -> Optional[np.ndarray]:
+        """获取原始点数据（子类应重写此方法）
+
+        Returns:
+            点数组 (n, 3) 或 None
+        """
+        return None
+
+    def get_transformed_points(self) -> Optional[np.ndarray]:
+        """获取应用变换后的点数据
+
+        Returns:
+            变换后的点数组 (n, 3) 或 None
+        """
+        points = self.get_points()
+        if points is None or len(points) == 0:
+            return None
+
+        # 如果没有变换矩阵，直接返回原始点
+        if len(self.matrices) == 0:
+            return points
+
+        # 转换为齐次坐标
+        if points.shape[1] == 3:
+            homogeneous = np.hstack([points, np.ones((len(points), 1))])
+        else:
+            homogeneous = points
+
+        transformed = homogeneous.copy()
+
+        '''
+        # 合并所有变换矩阵
+        final_matrix = np.eye(4)  # 4x4 单位矩阵，作为起始矩阵
+        for matrix in self.matrices:
+            final_matrix = matrix @ final_matrix  # 逐步合并变换矩阵
+
+        # 应用合并后的变换矩阵
+        transformed = transformed @ final_matrix.T
+        '''
+
+        # 返回3D坐标
+        return transformed[:, :3]
+
     def __repr__(self):
         return f"{self.__class__.__name__}(type={self.surface_type}, hide={self.hide})"

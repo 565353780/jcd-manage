@@ -44,7 +44,7 @@ class JCDRenderer:
         self.geometries.clear()
         self.coordinate_frame = None
     
-    def add_coordinate_frame(self, size: float = 10.0, origin: np.ndarray = None):
+    def add_coordinate_frame(self, size: float = 10.0, origin: Optional[np.ndarray] = None):
         """添加坐标系
         
         Args:
@@ -74,12 +74,12 @@ class JCDRenderer:
         
         geometries = []
         
-        # 直接使用points数组（已经包含所有变换）
-        if len(curve.points) < 2:
+        # 使用get_transformed_points()获取变换后的点
+        points_3d = curve.get_transformed_points()
+        if points_3d is None or len(points_3d) < 2:
             return geometries
         
         # 创建LineSet
-        points_3d = curve.points[:, :3]
         line_set = o3d.geometry.LineSet()
         line_set.points = o3d.utility.Vector3dVector(points_3d)
         
@@ -116,36 +116,36 @@ class JCDRenderer:
             color = self.COLORS['surface']
         
         geometries = []
-        grid = surface.get_control_point_grid()
         
-        if grid is None:
+        # 获取变换后的所有点
+        all_points = surface.get_transformed_points()
+        if all_points is None or surface.u_count() == 0 or surface.v_count() == 0:
             return geometries
+        
+        # 重构网格结构
+        grid = all_points.reshape(surface.u_count(), surface.v_count(), 3)
         
         # 创建网格线（U方向和V方向）
         if show_wireframe:
             # U方向曲线
             for i in range(surface.u_count()):
-                u_curve = surface.get_u_curve(i)
-                if u_curve is not None:
-                    points_3d = u_curve[:, :3]
-                    line_set = o3d.geometry.LineSet()
-                    line_set.points = o3d.utility.Vector3dVector(points_3d)
-                    lines = [[j, j + 1] for j in range(len(points_3d) - 1)]
-                    line_set.lines = o3d.utility.Vector2iVector(lines)
-                    line_set.paint_uniform_color(color)
-                    geometries.append(line_set)
+                points_3d = grid[i, :, :]
+                line_set = o3d.geometry.LineSet()
+                line_set.points = o3d.utility.Vector3dVector(points_3d)
+                lines = [[j, j + 1] for j in range(len(points_3d) - 1)]
+                line_set.lines = o3d.utility.Vector2iVector(lines)
+                line_set.paint_uniform_color(color)
+                geometries.append(line_set)
             
             # V方向曲线
             for j in range(surface.v_count()):
-                v_curve = surface.get_v_curve(j)
-                if v_curve is not None:
-                    points_3d = v_curve[:, :3]
-                    line_set = o3d.geometry.LineSet()
-                    line_set.points = o3d.utility.Vector3dVector(points_3d)
-                    lines = [[i, i + 1] for i in range(len(points_3d) - 1)]
-                    line_set.lines = o3d.utility.Vector2iVector(lines)
-                    line_set.paint_uniform_color(color)
-                    geometries.append(line_set)
+                points_3d = grid[:, j, :]
+                line_set = o3d.geometry.LineSet()
+                line_set.points = o3d.utility.Vector3dVector(points_3d)
+                lines = [[i, i + 1] for i in range(len(points_3d) - 1)]
+                line_set.lines = o3d.utility.Vector2iVector(lines)
+                line_set.paint_uniform_color(color)
+                geometries.append(line_set)
         
         return geometries
     
@@ -165,15 +165,14 @@ class JCDRenderer:
         geometries = []
         
         # 根据钻石类型创建不同的几何体
-        # 这里使用简化的表示：一个变换后的球体
+        # 这里使用简化的表示：一个球体
         sphere = o3d.geometry.TriangleMesh.create_sphere(radius=1.0, resolution=20)
         sphere.paint_uniform_color(color)
-        
-        # 应用变换矩阵
-        sphere.transform(diamond.matrix)
-        
-        # 添加法向量以获得更好的渲染效果
         sphere.compute_vertex_normals()
+        
+        # 应用钻石的完整变换矩阵
+        transform_matrix = diamond.get_transform_matrix()
+        sphere.transform(transform_matrix)
         
         geometries.append(sphere)
         
@@ -194,13 +193,27 @@ class JCDRenderer:
             color = self.COLORS['font_surface']
         
         geometries = []
-        outlines = font_surface.get_all_outlines()
         
-        for outline in outlines:
+        # 使用get_transformed_points()获取变换后的所有点
+        all_points = font_surface.get_transformed_points()
+        if all_points is None or len(all_points) == 0:
+            return geometries
+        
+        # 按轮廓分割点
+        outline_sizes = font_surface.outline_sizes
+        start_idx = 0
+        
+        for size in outline_sizes:
+            if start_idx + size > len(all_points):
+                break
+            
+            outline = all_points[start_idx:start_idx + size]
+            start_idx += size
+            
             if len(outline) < 2:
                 continue
             
-            # 创建轮廓线
+            # 创建闭合轮廓线
             line_set = o3d.geometry.LineSet()
             line_set.points = o3d.utility.Vector3dVector(outline)
             
@@ -223,7 +236,7 @@ class JCDRenderer:
         Args:
             guide_line: JCDGuideLine对象
             color: 颜色RGB，默认使用预设颜色
-            length: 线段长度
+            length: 线段长度（该参数已由get_points()内部处理）
             
         Returns:
             几何体列表
@@ -233,16 +246,13 @@ class JCDRenderer:
         
         geometries = []
         
-        # 获取位置和方向
-        position = guide_line.get_position()
-        direction = guide_line.get_direction()
-        
-        # 创建辅助线（从位置延伸）
-        start_point = position - direction * length / 2
-        end_point = position + direction * length / 2
+        # 使用get_transformed_points()获取变换后的起点和终点
+        points = guide_line.get_transformed_points()
+        if points is None or len(points) < 2:
+            return geometries
         
         line_set = o3d.geometry.LineSet()
-        line_set.points = o3d.utility.Vector3dVector([start_point, end_point])
+        line_set.points = o3d.utility.Vector3dVector(points)
         line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
         line_set.paint_uniform_color(color)
         
@@ -266,12 +276,12 @@ class JCDRenderer:
         
         geometries = []
         
-        # 获取子曲面的点
-        points = bool_surface.get_sub_surface_points()
+        # 使用get_transformed_points()获取变换后的点
+        points = bool_surface.get_transformed_points()
         if points is not None and len(points) > 0:
             # 创建点云表示
             pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(points[:, :3])
+            pcd.points = o3d.utility.Vector3dVector(points)
             pcd.paint_uniform_color(color)
             geometries.append(pcd)
         
@@ -298,8 +308,10 @@ class JCDRenderer:
         if quad_type.num_vertices() == 0 or quad_type.num_quads() == 0:
             return geometries
         
-        # 创建网格
-        vertices = quad_type.points[:, :3]
+        # 使用get_transformed_points()获取变换后的顶点
+        vertices = quad_type.get_transformed_points()
+        if vertices is None:
+            return geometries
         
         # 将四边形分解为三角形
         triangles = []

@@ -109,6 +109,16 @@ class JCDCurve(JCDBaseData):
         transformed = (matrix @ self.points.T).T
         self.points = transformed
     
+    def get_points(self) -> Optional[np.ndarray]:
+        """获取原始点数据
+        
+        Returns:
+            点数组 (n, 3)
+        """
+        if len(self.points) == 0:
+            return None
+        return self.points[:, :3]
+    
     def __repr__(self):
         return (f"JCDCurve(material='{self.material_name}', "
                 f"curves={self.ring_count}, "

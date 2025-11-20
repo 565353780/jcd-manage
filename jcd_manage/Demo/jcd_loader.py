@@ -2,7 +2,7 @@ from jcd_manage.Module.jcd_loader import JCDLoader
 
 def demo():
     jcd_txt_file_path = '/Users/chli/Downloads/001_0001.jcd'
-    output_info = True
+    output_info = False
     save_txt_file_path = '/Users/chli/Downloads/001_0001.txt'
     overwrite = True
 

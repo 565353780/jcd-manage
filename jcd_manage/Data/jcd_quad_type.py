@@ -120,6 +120,16 @@ class JCDQuadType(JCDBaseData):
         
         return normals
     
+    def get_points(self) -> Optional[np.ndarray]:
+        """获取原始点数据
+        
+        Returns:
+            点数组 (n, 3)
+        """
+        if len(self.points) == 0:
+            return None
+        return self.points[:, :3]
+    
     def __repr__(self):
         return (f"JCDQuadType(material='{self.material_name}', "
                 f"vertices={self.num_vertices()}, "

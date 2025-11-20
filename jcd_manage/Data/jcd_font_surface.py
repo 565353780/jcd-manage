@@ -157,6 +157,39 @@ class JCDFontSurface(JCDBaseData):
         # 转回3D坐标
         self.points = transformed[:, :3]
     
+    def get_points(self) -> Optional[np.ndarray]:
+        """获取原始点数据
+        
+        Returns:
+            点数组 (n, 3)
+        """
+        if len(self.points) == 0:
+            return None
+        return self.points
+    
+    def get_transformed_points(self) -> Optional[np.ndarray]:
+        """获取应用变换后的点数据（包括自身matrix和继承的matrices）
+        
+        Returns:
+            变换后的点数组 (n, 3) 或 None
+        """
+        points = self.get_points()
+        if points is None or len(points) == 0:
+            return None
+        
+        # 转换为齐次坐标
+        homogeneous = np.hstack([points, np.ones((len(points), 1))])
+        
+        # 先应用自身的matrix
+        transformed = (self.matrix @ homogeneous.T).T
+        
+        # 再应用继承自基类的所有变换矩阵
+        for matrix in self.matrices:
+            transformed = (matrix @ transformed.T).T
+        
+        # 返回3D坐标
+        return transformed[:, :3]
+    
     def __repr__(self):
         return (f"JCDFontSurface(material='{self.material_name}', "
                 f"outlines={self.outline_count}, "

@@ -95,6 +95,31 @@ class JCDDiamond(JCDBaseData):
         }
         return type_names.get(self.diamond_type, str(self.diamond_type))
     
+    def get_points(self) -> Optional[np.ndarray]:
+        """获取钻石的中心点（用于可视化）
+        
+        Returns:
+            中心点数组 (1, 3)
+        """
+        # 钻石用位置作为其"点"
+        position = self.get_position()
+        return position.reshape(1, 3)
+    
+    def get_transform_matrix(self) -> np.ndarray:
+        """获取完整的变换矩阵（包括自身matrix和继承的matrices）
+        
+        Returns:
+            4x4变换矩阵
+        """
+        # 从自身的matrix开始
+        result = self.matrix.copy()
+        
+        # 应用继承自基类的所有变换矩阵
+        for matrix in self.matrices:
+            result = matrix @ result
+        
+        return result
+    
     def __repr__(self):
         return (f"JCDDiamond(material='{self.material_name}', "
                 f"type={self.get_diamond_type_name()}, "
