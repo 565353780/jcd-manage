@@ -1,6 +1,6 @@
 import struct
 import numpy as np
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, List
 
 from jcd_manage.Config.types import SurfaceType, DiamondType, BlockType, BoolType, CurveType
 
@@ -355,3 +355,40 @@ def read_by_surface_type(jcd_file, surface_type: SurfaceType) -> Dict[str, Any]:
         'matrices': matrices,
         **type_data
     }
+
+def save_entities_to_text(all_entities: List[Dict[str, Any]], file_path: str) -> bool:
+    """将实体数据保存到文本文件"""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write("JCD文件解析结果\n")
+        f.write("="*80 + "\n\n")
+
+        for i, entity in enumerate(all_entities):
+            f.write(f"实体 #{i}\n")
+            f.write("-"*80 + "\n")
+            f.write(f"类型: {entity.get('surface_type')}\n")
+
+            if 'material_name' in entity:
+                f.write(f"材质: {entity['material_name']}\n")
+
+            if 'matrices' in entity and len(entity['matrices']) > 0:
+                f.write(f"\n矩阵 (数量: {len(entity['matrices'])}):\n")
+                for j, matrix in enumerate(entity['matrices']):
+                    f.write(f"  矩阵 {j}:\n")
+                    f.write(f"{matrix}\n")
+
+            if 'points' in entity and len(entity['points']) > 0:
+                f.write(f"\n点 (数量: {len(entity['points'])}, 形状: {entity['points'].shape}):\n")
+                # 只打印前10个点
+                points_to_show = min(10, len(entity['points']))
+                for j in range(points_to_show):
+                    f.write(f"  {entity['points'][j]}\n")
+                if len(entity['points']) > 10:
+                    f.write(f"  ... (还有 {len(entity['points']) - 10} 个点)\n")
+
+            if 'ring_count' in entity:
+                f.write(f"\n环数量: {entity['ring_count']}\n")
+                f.write(f"原始点数: {entity['original_point_count']}\n")
+
+            f.write("\n" + "="*80 + "\n\n")
+
+    return True
