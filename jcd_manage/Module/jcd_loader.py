@@ -145,7 +145,10 @@ class JCDLoader(object):
                     # 确定布尔操作类型映射
 
                     # 将曲面添加到DAG中
-                    surface_node_id = current_bool_surface.add_surface(entity_data)
+                    surface_type = entity_data['surface_type']
+                    entity_class = self.TYPE_CLASS_MAP.get(surface_type, JCDBaseData)
+                    entity_instance = entity_class.from_dict(entity_data)
+                    surface_node_id = current_bool_surface.add_surface(entity_instance)
                     bool_operation_stack[-1][1].append(surface_node_id)
 
                     if output_info:
@@ -238,6 +241,18 @@ class JCDLoader(object):
         """获取所有字体面片"""
         return [obj for obj in self.objects if isinstance(obj, JCDFontSurface)]
 
+    def get_bool_surfaces(self) -> List[Union[JCDDiamond, JCDSurface]]:
+        """获取所有布尔曲面"""
+        entity_list = []
+        for obj in self.objects:
+            if not isinstance(obj, JCDBoolSurface):
+                continue
+
+            surfaces = obj.get_surfaces()
+            entity_list += surfaces
+
+        return entity_list
+
     def get_visible_objects(self) -> List[JCDBaseData]:
         """获取所有可见对象"""
         return [obj for obj in self.objects if not obj.hide]
@@ -278,6 +293,7 @@ class JCDLoader(object):
             (self.get_curves(), [1.0, 0.0, 0.0]),      # 红色曲线
             (self.get_surfaces(), [0.0, 1.0, 0.0]),    # 绿色曲面
             (self.get_diamonds(), [1.0, 0.84, 0.0]),   # 金色钻石
+            (self.get_bool_surfaces(), [1.0, 0.0, 1.0]),   # 洋红色
         ]
         renderMultipleGroups(groups)
         return True
@@ -319,10 +335,6 @@ class JCDLoader(object):
             print(f"  尺寸: [{size[0]:.2f}, {size[1]:.2f}, {size[2]:.2f}]")
 
         print(f"{'='*60}\n")
-    
-    def get_bool_surfaces(self) -> List[JCDBoolSurface]:
-        """获取所有布尔曲面"""
-        return [obj for obj in self.objects if isinstance(obj, JCDBoolSurface)]
     
     def render_bool_surfaces(self) -> bool:
         """渲染布尔曲面的DAG结构"""

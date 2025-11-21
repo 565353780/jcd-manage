@@ -1,5 +1,4 @@
 """JCD布尔曲面数据类 - 基于DAG结构"""
-import numpy as np
 from typing import Dict, Any, Optional, List
 from jcd_manage.Data.jcd_base import JCDBaseData
 from jcd_manage.Config.types import BoolType, DAGBoolType
@@ -108,18 +107,24 @@ class JCDBoolSurface(JCDBaseData):
         else:
             print("布尔曲面DAG结构为空")
     
-    def get_bounding_box(self) -> Optional[tuple]:
-        """计算整体边界框
+    def get_surfaces(self) -> List[Dict[str, Any]]:
+        """获取保存在DAG中的所有原始曲面
         
         Returns:
-            (min_point, max_point) 或 None
+            原始曲面数据字典列表
         """
-        if self.root_node_id is None:
-            return None
+        surfaces = []
         
-        # 简化实现，实际应该遍历所有原始曲面节点计算边界框
-        # 这里只是返回默认值，后续需要完善
-        return np.array([-1, -1, -1]), np.array([1, 1, 1])
+        if not self.dag or not self.dag.nodes:
+            return surfaces
+        
+        # 遍历DAG中的所有节点
+        for node_id, node in self.dag.nodes.items():
+            # 如果是原始曲面节点，添加其数据
+            if isinstance(node, PrimitiveSurface):
+                surfaces.append(node.surface_data)
+        
+        return surfaces
     
     def get_surface_count(self) -> int:
         """获取曲面数量"""
