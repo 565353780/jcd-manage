@@ -117,12 +117,6 @@ class JCDRenderer:
         geometries = []
 
         all_points = surface.get_points()
-        bbox_min, bbox_max = surface.get_bounding_box()
-
-        bbox_bound = np.max(bbox_max - bbox_min)
-        if bbox_bound < 22:
-            return geometries
-        print(bbox_bound)
 
         if all_points is None or surface.u_count() == 0 or surface.v_count() == 0:
             return geometries
