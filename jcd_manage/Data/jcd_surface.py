@@ -18,6 +18,9 @@ class JCDSurface(JCDBaseData):
         self.ring_count: int = 0  # U方向曲线数量
         self.original_point_count: int = 0  # V方向点数
         self.curve_type: Optional[CurveType] = None
+        self.is_path_closed: bool = False
+        self.is_cross_section_closed: bool = False
+        self.normal_direction: int = 1
         self.unknown_data: bytes = b''
     
     def _load_from_dict(self, data: Dict[str, Any]):
@@ -28,6 +31,9 @@ class JCDSurface(JCDBaseData):
         self.ring_count = data.get('ring_count', 0)
         self.original_point_count = data.get('original_point_count', 0)
         self.curve_type = data.get('curve_type')
+        self.is_path_closed = data.get('is_path_closed', False)
+        self.is_cross_section_closed = data.get('is_cross_section_closed', False)
+        self.normal_direction = data.get('normal_direction', 1)
         self.unknown_data = data.get('unknown_data', b'')
     
     def to_dict(self) -> Dict[str, Any]:
@@ -39,7 +45,9 @@ class JCDSurface(JCDBaseData):
             'ring_count': self.ring_count,
             'original_point_count': self.original_point_count,
             'curve_type': self.curve_type,
-            'unknown_data': self.unknown_data,
+            'is_path_closed': self.is_path_closed,
+            'is_cross_section_closed': self.is_cross_section_closed,
+            'normal_direction': self.normal_direction,
         })
         return data
     

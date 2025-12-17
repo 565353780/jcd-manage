@@ -169,7 +169,13 @@ def read_surface(jcd_file) -> Dict[str, Any]:
     ring_count, original_point_count = read_ring_count(jcd_file)
     curve_type = read_curve_type(jcd_file)
 
-    unkown_data = jcd_file.read(49)
+    unkown_data = jcd_file.read(7)
+    is_path_closed = int.from_bytes(jcd_file.read(1), 'little') == 1
+    unkown_data = jcd_file.read(19)
+    is_cross_section_closed = int.from_bytes(jcd_file.read(1), 'little') == 1
+    unkown_data = jcd_file.read(11)
+    normal_direction = int.from_bytes(jcd_file.read(4), 'little', signed=True)
+    unkown_data = jcd_file.read(6)
 
     return {
         'material_name': material_name,
@@ -177,6 +183,9 @@ def read_surface(jcd_file) -> Dict[str, Any]:
         'ring_count': ring_count,
         'original_point_count': original_point_count,
         'curve_type': curve_type,
+        'is_path_closed': is_path_closed,
+        'is_cross_section_closed': is_cross_section_closed,
+        'normal_direction': normal_direction,
         # 'unknown_data': unkown_data
     }
 
